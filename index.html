@@ -1,0 +1,41 @@
+async function runEvaluation() {
+  const fileInput = document.getElementById("imageUpload");
+  const file = fileInput.files[0];
+
+  if (!file) {
+    alert("請先上傳圖片");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = async function() {
+    const base64 = reader.result.split(",")[1];
+
+    const response = await fetch("/api/analyze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ image: base64 })
+    });
+
+    const result = await response.json();
+
+    document.getElementById("jsonOutput").textContent =
+      JSON.stringify(result, null, 2);
+
+    const feedback = evaluate(result);
+    const feedbackDiv = document.getElementById("feedback");
+    feedbackDiv.innerHTML = "";
+
+    feedback.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "p-3 rounded-lg bg-gray-50";
+      div.textContent = item;
+      feedbackDiv.appendChild(div);
+    });
+  };
+
+  reader.readAsDataURL(file);
+}
