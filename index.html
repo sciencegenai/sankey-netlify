@@ -1,4 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>桑基圖自動評分 Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen p-6">
+
+<div class="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-6">
+
+  <h1 class="text-2xl font-bold text-blue-600 mb-4">
+    能源桑基圖自動評分 Demo
+  </h1>
+
+  <!-- 題目說明 -->
+  <div class="bg-blue-50 p-4 rounded-lg mb-6">
+    <p>輸入能量：電能 100 J</p>
+    <p>輸出能量：光能 80 J、熱能 20 J</p>
+    <p class="text-sm text-gray-600">每 1 格代表 10 J</p>
+  </div>
+
+  <!-- 上傳區 -->
+  <div class="mb-4">
+    <input 
+      type="file" 
+      id="imageUpload" 
+      accept="image/*"
+      class="block w-full text-sm text-gray-600
+      file:mr-4 file:py-2 file:px-4
+      file:rounded-lg file:border-0
+      file:text-sm file:font-semibold
+      file:bg-blue-100 file:text-blue-700
+      hover:file:bg-blue-200"
+    />
+  </div>
+
+  <!-- 預覽 -->
+  <img id="preview" class="hidden max-h-64 rounded-lg mb-4"/>
+
+  <!-- 按鈕 -->
+  <button 
+    onclick="runEvaluation()" 
+    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+  >
+    開始評分
+  </button>
+
+  <!-- JSON 輸出 -->
+  <div class="mt-6">
+    <h2 class="font-semibold mb-2">AI 抽取結果（JSON）</h2>
+    <pre id="jsonOutput" class="bg-gray-100 p-4 rounded-lg text-sm overflow-x-auto"></pre>
+  </div>
+
+  <!-- 評分結果 -->
+  <div class="mt-6">
+    <h2 class="font-semibold mb-2">評分結果</h2>
+    <div id="feedback" class="space-y-2"></div>
+  </div>
+
+</div>
+
+<script>
+
+const upload = document.getElementById("imageUpload");
+const preview = document.getElementById("preview");
+
+upload.addEventListener("change", function () {
+  const file = this.files[0];
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.classList.remove("hidden");
+  }
+});
+
 async function runEvaluation() {
+
   const fileInput = document.getElementById("imageUpload");
   const file = fileInput.files[0];
 
@@ -9,7 +87,8 @@ async function runEvaluation() {
 
   const reader = new FileReader();
 
-  reader.onload = async function() {
+  reader.onload = async function () {
+
     const base64 = reader.result.split(",")[1];
 
     const response = await fetch("/api/analyze", {
@@ -26,6 +105,7 @@ async function runEvaluation() {
       JSON.stringify(result, null, 2);
 
     const feedback = evaluate(result);
+
     const feedbackDiv = document.getElementById("feedback");
     feedbackDiv.innerHTML = "";
 
@@ -35,7 +115,62 @@ async function runEvaluation() {
       div.textContent = item;
       feedbackDiv.appendChild(div);
     });
+
   };
 
   reader.readAsDataURL(file);
 }
+
+
+// ====== 規則判分引擎 ======
+
+function evaluate(data) {
+
+  const feedback = [];
+
+  if (!data.input || !data.outputs) {
+    feedback.push("⚠ AI 未能正確解析圖像，請重新拍攝。");
+    return feedback;
+  }
+
+  const input = data.input;
+  const outputs = data.outputs;
+
+  const horizontalOutputs = outputs.filter(o => o.direction === "horizontal");
+  const downwardOutputs = outputs.filter(o => o.direction === "downward");
+
+  // 結構檢查
+  if (input.direction === "horizontal" &&
+      horizontalOutputs.length > 0 &&
+      downwardOutputs.length > 0) {
+    feedback.push("✅ 箭頭方向正確");
+  } else {
+    feedback.push("⚠ 請確認光能為水平箭頭，熱能為向下箭頭");
+  }
+
+  // 比例檢查
+  if (Math.abs(input.width - 10) <= 1 &&
+      horizontalOutputs.length > 0 &&
+      downwardOutputs.length > 0 &&
+      Math.abs(horizontalOutputs[0].width - 8) <= 1 &&
+      Math.abs(downwardOutputs[0].width - 2) <= 1) {
+    feedback.push("✅ 能量比例正確");
+  } else {
+    feedback.push("⚠ 請檢查是否為 8 格光能、2 格熱能");
+  }
+
+  // 守恆檢查
+  const sumOutputs = outputs.reduce((sum, o) => sum + o.width, 0);
+  if (Math.abs(sumOutputs - input.width) <= 1) {
+    feedback.push("✅ 能量守恆正確");
+  } else {
+    feedback.push("⚠ 所有輸出能量總和應等於輸入能量");
+  }
+
+  return feedback;
+}
+
+</script>
+
+</body>
+</html>
