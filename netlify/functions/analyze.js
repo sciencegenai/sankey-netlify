@@ -34,12 +34,13 @@ Do NOT judge correctness.
             content: [
               {
                 type: "text",
-                text: "Device: Flashlight. Input 100 J. Outputs 80 J light, 20 J heat."
+                text: "Extract only what you can see in the image."
               },
               {
                 type: "image_url",
                 image_url: {
                   url: `data:image/jpeg;base64,${imageBase64}`
+                  
                 }
               }
             ]
